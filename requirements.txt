@@ -10,3 +10,4 @@ faiss-cpu
 pypdf
 duckduckgo-search
 python-dotenv
+langgraph-checkpoint-sqlite
