@@ -1,5 +1,8 @@
 from __future__ import annotations
 import os
+print("GROQ key present:", bool(os.getenv("GROQ_API_KEY")))
+print("GROQ key length:", len(os.getenv("GROQ_API_KEY", "")))
+import os
 import sqlite3
 import tempfile
 import logging
