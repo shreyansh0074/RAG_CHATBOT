@@ -1,20 +1,15 @@
 import uuid
-
 import streamlit as st
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
-
 from backend import (
     chatbot,
     ingest_pdf,
-    retrieve_all_threads,
     thread_document_metadata,
 )
-
 
 # =========================== Utilities ===========================
 def generate_thread_id():
     return uuid.uuid4()
-
 
 def reset_chat():
     thread_id = generate_thread_id()
@@ -22,16 +17,13 @@ def reset_chat():
     add_thread(thread_id)
     st.session_state["message_history"] = []
 
-
 def add_thread(thread_id):
     if thread_id not in st.session_state["chat_threads"]:
         st.session_state["chat_threads"].append(thread_id)
 
-
 def load_conversation(thread_id):
     state = chatbot.get_state(config={"configurable": {"thread_id": thread_id}})
     return state.values.get("messages", [])
-
 
 # ======================= Session Initialization ===================
 if "message_history" not in st.session_state:
@@ -41,7 +33,10 @@ if "thread_id" not in st.session_state:
     st.session_state["thread_id"] = generate_thread_id()
 
 if "chat_threads" not in st.session_state:
-    st.session_state["chat_threads"] = retrieve_all_threads()
+    # Only track threads created in THIS browser session — never seed from the
+    # shared backend, which would otherwise leak every visitor's past chats
+    # into every other visitor's sidebar.
+    st.session_state["chat_threads"] = []
 
 add_thread(st.session_state["thread_id"])
 
