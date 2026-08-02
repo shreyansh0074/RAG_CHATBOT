@@ -12,16 +12,27 @@ from backend import (
 
 # =========================== Utilities ===========================
 def generate_thread_id():
-    return uuid.uuid4()
+    return str(uuid.uuid4())
+
+
+def rebuild_history(thread_id: str):
+    """Reconstruct display-friendly message_history from SQLite for a thread."""
+    history = []
+    for msg in chatbot.get_state(
+        config={"configurable": {"thread_id": thread_id}}
+    ).values.get("messages", []):
+        if isinstance(msg, HumanMessage):
+            history.append({"role": "user", "content": msg.content})
+        elif isinstance(msg, AIMessage) and msg.content:
+            history.append({"role": "assistant", "content": msg.content})
+    return history
 
 
 def reset_chat():
     thread_id = generate_thread_id()
     st.session_state["thread_id"] = thread_id
-    st.query_params["thread"] = str(thread_id)
     add_thread(thread_id)
     st.session_state["message_history"] = []
-    st.session_state["history_loaded"] = True
 
 
 def add_thread(thread_id):
@@ -35,9 +46,6 @@ def load_conversation(thread_id):
 
 
 # ======================= Session Initialization ===================
-if "message_history" not in st.session_state:
-    st.session_state["message_history"] = []
-
 if "thread_id" not in st.session_state:
     # Reuse the thread_id from the URL (?thread=...) if this is a page refresh
     # of an existing conversation; otherwise start a fresh one. Only this
@@ -46,9 +54,10 @@ if "thread_id" not in st.session_state:
     url_thread = st.query_params.get("thread")
     if url_thread:
         st.session_state["thread_id"] = url_thread
+        st.session_state["message_history"] = rebuild_history(url_thread)
     else:
         st.session_state["thread_id"] = generate_thread_id()
-        st.query_params["thread"] = str(st.session_state["thread_id"])
+        st.session_state["message_history"] = []
 
 if "chat_threads" not in st.session_state:
     # Only track threads created in THIS browser session — never seed from the
@@ -56,19 +65,10 @@ if "chat_threads" not in st.session_state:
     # into every other visitor's sidebar.
     st.session_state["chat_threads"] = []
 
-if "history_loaded" not in st.session_state:
-    # On a fresh page load (including a refresh), rebuild message_history from
-    # SQLite for this thread_id so the conversation reappears instead of
-    # looking empty.
-    st.session_state["message_history"] = []
-    for msg in chatbot.get_state(
-        config={"configurable": {"thread_id": str(st.session_state["thread_id"])}}
-    ).values.get("messages", []):
-        if isinstance(msg, HumanMessage):
-            st.session_state["message_history"].append({"role": "user", "content": msg.content})
-        elif isinstance(msg, AIMessage) and msg.content:
-            st.session_state["message_history"].append({"role": "assistant", "content": msg.content})
-    st.session_state["history_loaded"] = True
+# Reconcile the URL on every single run (not just when a thread is first
+# created) so the address bar always matches the active thread, even right
+# after "New Chat" — this is what makes a manual refresh reliable.
+st.query_params["thread"] = str(st.session_state["thread_id"])
 
 add_thread(st.session_state["thread_id"])
 
